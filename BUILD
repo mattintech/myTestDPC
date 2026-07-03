@@ -12,6 +12,11 @@ MANIFEST_DEBUG = "src/main/AndroidManifestDebug.xml"
 
 PACKAGE = "com.afwsamples.testdpc"
 
+# Installed package identity (applicationId). Kept distinct from PACKAGE (the Java/R
+# namespace) so Play Protect does not flag this debug-signed build as a repackaged
+# copy of the Google-signed com.afwsamples.testdpc.
+APPLICATION_ID = "com.mattintech.mytestdpc"
+
 android_library(
     name = "androidx_deps",
     exports = [
@@ -69,6 +74,7 @@ android_binary(
         "--force-jumbo",
     ],
     manifest = MANIFEST,
+    manifest_values = {"applicationId": APPLICATION_ID},
     multidex = "native",
     deps = [
         ":testdpc_lib",
