@@ -43,6 +43,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -310,6 +311,7 @@ public class PolicyManagementFragment extends BaseSearchablePolicyPreferenceFrag
   private static final String ENABLE_SYSTEM_APPS_BY_PACKAGE_NAME_KEY =
       "enable_system_apps_by_package_name";
   private static final String ENABLE_SYSTEM_APPS_KEY = "enable_system_apps";
+  private static final String SET_DEFAULT_LAUNCHER_KEY = "set_default_launcher";
   private static final String INSTALL_EXISTING_PACKAGE_KEY = "install_existing_packages";
   private static final String INSTALL_APK_PACKAGE_KEY = "install_apk_package";
   private static final String UNINSTALL_PACKAGE_KEY = "uninstall_package";
@@ -742,6 +744,7 @@ public class PolicyManagementFragment extends BaseSearchablePolicyPreferenceFrag
     findPreference(ENABLE_SYSTEM_APPS_KEY).setOnPreferenceClickListener(this);
     findPreference(ENABLE_SYSTEM_APPS_BY_PACKAGE_NAME_KEY).setOnPreferenceClickListener(this);
     findPreference(ENABLE_SYSTEM_APPS_BY_INTENT_KEY).setOnPreferenceClickListener(this);
+    findPreference(SET_DEFAULT_LAUNCHER_KEY).setOnPreferenceClickListener(this);
     mInstallExistingPackagePreference =
         (DpcPreference) findPreference(INSTALL_EXISTING_PACKAGE_KEY);
     mInstallExistingPackagePreference.setOnPreferenceClickListener(this);
@@ -1172,6 +1175,9 @@ public class PolicyManagementFragment extends BaseSearchablePolicyPreferenceFrag
       return true;
     } else if (ENABLE_SYSTEM_APPS_BY_PACKAGE_NAME_KEY.equals(key)) {
       showEnableSystemAppByPackageNamePrompt();
+      return true;
+    } else if (SET_DEFAULT_LAUNCHER_KEY.equals(key)) {
+      showSetDefaultLauncherPrompt();
       return true;
     } else if (ENABLE_SYSTEM_APPS_BY_INTENT_KEY.equals(key)) {
       showFragment(new EnableSystemAppsByIntentFragment());
@@ -3040,6 +3046,67 @@ public class PolicyManagementFragment extends BaseSearchablePolicyPreferenceFrag
             })
         .setNegativeButton(android.R.string.cancel, null)
         .show();
+  }
+
+  /**
+   * Prompts for a launcher package name and pins it as the default HOME activity via
+   * {@link android.app.admin.DevicePolicyManager#addPersistentPreferredActivity}. This makes the
+   * given app the default launcher without using lock task mode.
+   */
+  private void showSetDefaultLauncherPrompt() {
+    if (getActivity() == null || getActivity().isFinishing()) {
+      return;
+    }
+    LinearLayout inputContainer =
+        (LinearLayout) getActivity().getLayoutInflater().inflate(R.layout.simple_edittext, null);
+    final EditText editText = (EditText) inputContainer.findViewById(R.id.input);
+    editText.setHint(getString(R.string.package_name_hints));
+
+    new AlertDialog.Builder(getActivity())
+        .setTitle(getString(R.string.set_default_launcher))
+        .setView(inputContainer)
+        .setPositiveButton(
+            android.R.string.ok,
+            (dialog, which) -> setDefaultLauncher(editText.getText().toString().trim()))
+        .setNegativeButton(android.R.string.cancel, null)
+        .show();
+  }
+
+  private void setDefaultLauncher(String packageName) {
+    if (packageName.isEmpty()) {
+      showToast(R.string.set_default_launcher_error_msg, packageName);
+      return;
+    }
+    // Resolve the HOME activity that this package declares.
+    Intent homeIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+    homeIntent.setPackage(packageName);
+    ResolveInfo resolveInfo =
+        getActivity()
+            .getPackageManager()
+            .resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY);
+    if (resolveInfo == null || resolveInfo.activityInfo == null) {
+      showToast(R.string.set_default_launcher_no_home, packageName);
+      return;
+    }
+    final ComponentName activity =
+        new ComponentName(resolveInfo.activityInfo.packageName, resolveInfo.activityInfo.name);
+    IntentFilter filter = new IntentFilter(Intent.ACTION_MAIN);
+    filter.addCategory(Intent.CATEGORY_HOME);
+    filter.addCategory(Intent.CATEGORY_DEFAULT);
+    mDevicePolicyManagerGateway.addPersistentPreferredActivity(
+        activity,
+        filter,
+        (v) ->
+            onSuccessShowToast(
+                "addPersistentPreferredActivity",
+                R.string.set_default_launcher_success_msg,
+                activity.flattenToShortString()),
+        (e) ->
+            onErrorShowToast(
+                "addPersistentPreferredActivity",
+                e,
+                R.string.set_default_launcher_error_msg,
+                packageName));
   }
 
   private void showConfigurePolicyAndManageCredentialsPrompt() {

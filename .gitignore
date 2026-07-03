@@ -5,3 +5,6 @@ bazel-testlogs
 **/*.iml
 .idea
 *.lock
+
+# Bazel build symlinks
+/bazel-*

@@ -138,6 +138,12 @@
             android:title="@string/enable_system_apps_by_intent"
             testdpc:minSdkVersion="L"
             testdpc:delegation="delegation-enable-system-app" />
+        <com.afwsamples.testdpc.common.preference.DpcPreference
+            android:key="set_default_launcher"
+            android:title="@string/set_default_launcher"
+            android:summary="@string/set_default_launcher_summary"
+            testdpc:minSdkVersion="L"
+            testdpc:admin="deviceOwner" />
         <!-- custom constraint: validateAffiliatedUserAfterP -->
         <com.afwsamples.testdpc.common.preference.DpcPreference
             android:key="install_existing_packages"
