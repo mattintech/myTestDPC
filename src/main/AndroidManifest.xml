@@ -246,7 +246,7 @@
             tools:node="remove" />
 
         <provider
-                android:authorities="com.afwsamples.testdpc.fileprovider"
+                android:authorities="${applicationId}.fileprovider"
                 android:name="androidx.core.content.FileProvider"
                 android:grantUriPermissions="true"
                 android:exported="false">
