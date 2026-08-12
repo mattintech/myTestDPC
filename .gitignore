@@ -8,3 +8,10 @@ bazel-testlogs
 
 # Bazel build symlinks
 /bazel-*
+
+# Python venv for scripts/provision.py
+.venv/
+
+# macOS
+.DS_Store
+__pycache__/
