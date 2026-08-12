@@ -1,135 +1,143 @@
-Test Device Policy Control (Test DPC) App
-=========================================
+myTestDPC
+=========
 
-Test DPC is an app designed to help EMMs, ISVs, and OEMs to test their applications and platforms in a Android enterprise managed profile (i.e. work profile). It serves as both a sample Device Policy Controller and a testing application to flex the APIs available for Android enterprise. It supports devices running Android 5.0 Lollipop or later.
+A fork of Google's [Test DPC](https://github.com/googlesamples/android-testdpc)
+for exercising Android Enterprise behaviour that upstream TestDPC does not
+surface.
 
-See the [documentation](https://developer.android.com/work/index.html) to learn more about Android in the enterprise.
+Upstream is a reference sample: it demonstrates the APIs Google wants to
+document. That leaves gaps — policies that exist in `DevicePolicyManager` but
+have no UI, combinations that only misbehave on real OEM hardware, and
+provisioning paths that are tedious to reproduce by hand. This fork fills those
+gaps so they can be tested on a device in minutes.
 
-## Getting Started
+Everything here tracks upstream closely and stays additive, so fixes from
+Google merge in cleanly. See [Fork layout](#fork-layout).
 
-This sample uses the Bazel build system. To build this project, use the "bazel build testdpc" command.
+## What this fork adds
 
-This app can also be found [on the Play store](https://play.google.com/store/apps/details?id=com.afwsamples.testdpc).
+### Set default launcher
+
+Pins a HOME app as the default launcher on a Device Owner device **without**
+LockTask. Upstream only offers lock task mode, which takes over the device
+entirely and breaks Samsung DeX.
+
+This surfaces the existing `addPersistentPreferredActivity` API in the UI:
+*Policy management → Apps management → Set default launcher*. Enter a package
+name; it resolves that package's HOME activity and registers a persistent
+preferred activity for the MAIN/HOME/DEFAULT filter. DeX keeps working.
+
+### One-command QR provisioning
+
+`scripts/provision.py` builds the APK, serves it over HTTP, and renders a
+provisioning QR — all from one command, with every value derived from the
+artifact you are actually serving.
+
+```console
+.venv/bin/python scripts/provision.py --build
+```
+
+Open the printed URL, factory reset the device, tap the welcome screen 6×, and
+scan. The page lets you flip the common provisioning extras and regenerates the
+QR live.
+
+See [docs/QR_PROVISIONING.md](docs/QR_PROVISIONING.md) for the full flow and
+why hand-built QR codes tend to fail.
+
+## Getting started
+
+Build with Bazel:
+
+```console
+./build.sh          # or: bazel build testdpc
+```
+
+Bazel needs `ANDROID_HOME` pointed at your Android SDK, and `ed` on your `PATH`
+(the setupdesign library is patched dynamically at build time).
+
+For the provisioning script, create the virtualenv once:
+
+```console
+python3 -m venv .venv
+.venv/bin/pip install segno
+```
+
+### Android Studio import
+
+Use the
+[Bazel for Android Studio](https://plugins.jetbrains.com/plugin/9185-bazel-for-android-studio)
+plugin and select the folder containing the `BUILD` file. When prompted for a
+"project view", choose "Copy external" and pick `scripts/ij.bazelproject`. Then
+create a Run Configuration of type "Bazel Command" with `//:testdpc` as the
+target expression.
 
 ## Provisioning
 
-You can find various kinds of provisioning methods [here](https://developers.google.com/android/work/prov-devices#Key_provisioning_differences_across_android_releases). Let's take a few of them as an example.
+`scripts/provision.py` covers the QR path end to end. The methods below come
+from upstream and still work unchanged.
 
-### AFW# code provisioning (Device Owner M+)
-1. Factory reset your device.
-2. Setup Wi-Fi
-3. When prompted to sign in, enter **afw#testdpc**
-4. Follow onscreen instructions
-  - Choose 'Use for work only' for fully managed setup.
+### AFW# code (Device Owner M+)
 
-### QR code provisioning (Device Owner N+ only)
-1. Factory reset your device and tap the welcome screen in setup wizard 6 times.
-1. On Android O or older, the setup wizard prompts the user to connect to the Internet so the setup wizard can download a QR code reader.
-   Android P and newer devices already have the QR code reader available.
-1. Generate a QR code with the content:
-   ```
-    {
-    	"android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.afwsamples.testdpc/com.afwsamples.testdpc.DeviceAdminReceiver",
-    	"android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": "gJD2YwtOiWJHkSMkkIfLRlj-quNqG1fb6v100QmzM9w=",
-    	"android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": "https://testdpc-latest-apk.appspot.com"
-    }
-   ```
-   or use this pre-made QR code:  
-   ![testdpc_provisioning](qrcode.png)
-1. Scan the QR code and follow onscreen instructions
+1. Factory reset the device.
+2. Set up Wi-Fi.
+3. When prompted to sign in, enter **afw#testdpc**.
+4. Follow the onscreen instructions — choose "Use for work only" for a fully
+   managed setup.
 
-#### Note
+### ADB
 
-If using this QR code your device is stuck on the configuring screen, it may due to a problem connecting to the `appspot.com` domain.
+```console
+# Device Owner
+adb shell dpm set-device-owner com.afwsamples.testdpc/.DeviceAdminReceiver
 
-In these cases you can use the [latest release](https://github.com/googlesamples/android-testdpc/releases/latest) available on github.
-You can also upload this version on your own server and use that as your download location.
-
-Replace the link used for `PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION` with a link to your APK. After that, regenerate the QR code.
-
-### ADB command
-
-#### Device Owner (DO)
-
-*   Run the `adb` command:
-
-    ```console
-    adb shell dpm set-device-owner com.afwsamples.testdpc/.DeviceAdminReceiver
-    ```
-
-#### Profile Owner - Personal device (PO - BYOD)
-
-*   Create a managed profile by launching the “Set up TestDPC” app
-*   Skip adding an account at the end of the flow
-
-#### Profile Owner - Corporate-owned device (PO - COPE)
-
-*   Create a managed profile by launching the “Set up TestDPC” app
-*   Skip adding an account at the end of the flow
-*   Run the `adb` command:
-
-    ```console
-    adb shell dpm mark-profile-owner-on-organization-owned-device --user 10 com.afwsamples.testdpc/.DeviceAdminReceiver`
-    ```
-
-#### TestDPC as DM role holder
-
-TestDPC v9.0.5+ can be setup as Device Management Role Holder.
-
-*   Running the following `adb` commands:
-
-    ```console
-    adb shell cmd role set-bypassing-role-qualification true
-    adb shell cmd role add-role-holder android.app.role.DEVICE_POLICY_MANAGEMENT com.afwsamples.testdpc
-    ```
-
-    Note: unlike DO/PO, this change is not persisted so TestDPC needs to be
-    marked as role holder again if the device reboots.
-
-## Android Studio import
-
-To import this repository in Android Studio, you need to use the 
-[Bazel for Android Studio](https://plugins.jetbrains.com/plugin/9185-bazel-for-android-studio)
-Plugin.
-
-When importing the project you have to select the folder containing the Bazel's
-`BUILD` file. When prompted to select a "project view", you can choose the
-option "Copy external" and choose the `scripts/ij.bazelproject` available in
-this repository.
-
-Once Bazel has complete the import operation and the first sync of the
-project, you can create a "Run Configuration".
-Select "Bazel Command" as Configuration type and add `//:testdpc` as
-"target expression".
-
-You can now run the project from inside Android Studio.
-
-## Building with Bazel
-
-The repository includes a `build.sh` script to build the application. The required
-[setupdesign library](https://android.googlesource.com/platform/external/setupdesign/+/refs/heads/main)
-is now imported and patched dynamically using the command line utility `ed`. This needs to be
-available on the path to successfully build the project.
-
-### `ANDROID_HOME` environment setup
-
-Bazel requires that you set the `ANDROID_HOME` environment variable to the path of your Android SDK.
-As an example, you can add to your `.bashrc` on linux:
-```
-export ANDROID_HOME=<Path to the Android SDK>
+# Profile Owner, corporate-owned (after creating a managed profile)
+adb shell dpm mark-profile-owner-on-organization-owned-device \
+    --user 10 com.afwsamples.testdpc/.DeviceAdminReceiver
 ```
 
-## Support
+For Profile Owner on a personal device (BYOD), launch the "Set up TestDPC" app
+to create a managed profile and skip adding an account.
 
-If you've found an error in this sample, please file an issue:
-https://github.com/googlesamples/android-testdpc/issues
+### As DM role holder
 
-Patches are encouraged, and may be submitted by forking this project and submitting a pull request through GitHub.
+```console
+adb shell cmd role set-bypassing-role-qualification true
+adb shell cmd role add-role-holder \
+    android.app.role.DEVICE_POLICY_MANAGEMENT com.afwsamples.testdpc
+```
+
+Not persisted across reboots — re-run after each restart.
+
+## Fork layout
+
+`master` mirrors `upstream/master` untouched. Development happens on
+`matts-testdpc`, which is `master` plus this fork's commits.
+
+```console
+git remote add upstream https://github.com/googlesamples/android-testdpc.git
+
+# refresh the mirror
+git checkout master
+git fetch upstream && git merge --ff-only upstream/master
+
+# replay this fork's commits on top
+git checkout matts-testdpc
+git rebase upstream/master
+```
+
+Changes here are kept **additive** — new files and appended entries rather than
+edits to upstream-owned lines — so rebases stay conflict-free. The package name
+is deliberately left as `com.afwsamples.testdpc`; overriding the `applicationId`
+was tried and reverted, since it breaks the FileProvider authority and the
+provisioning component name for no real benefit on a debug build.
+
+## Relationship to upstream
+
+This is a personal testing fork, not a replacement for TestDPC and not
+affiliated with Google. For the reference implementation, the Play Store build,
+or to report bugs in TestDPC itself, use
+[googlesamples/android-testdpc](https://github.com/googlesamples/android-testdpc).
 
 ## License
 
-Licensed under the Apache 2.0 license. See the LICENSE file for details.
-
-## How to make contributions?
-
-Please read and follow the steps in the CONTRIB file.
+Apache 2.0, inherited from upstream. See the LICENSE file.
