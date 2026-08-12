@@ -59,7 +59,7 @@ For the provisioning script, create the virtualenv once:
 
 ```console
 python3 -m venv .venv
-.venv/bin/pip install segno
+.venv/bin/pip install -r scripts/requirements.txt
 ```
 
 ### Android Studio import

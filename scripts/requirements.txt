@@ -1,0 +1,10 @@
+# Dependencies for scripts/provision.py
+#
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r scripts/requirements.txt
+#
+# aapt2 and apksigner are located automatically from the Android SDK; they are
+# not pip-installable and are not listed here.
+
+# Pure-Python QR generation -- no compiled extensions, no Pillow needed.
+segno>=1.6,<2

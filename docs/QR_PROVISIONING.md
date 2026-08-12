@@ -26,11 +26,15 @@ Once:
 
 ```console
 python3 -m venv .venv
-.venv/bin/pip install segno
+.venv/bin/pip install -r scripts/requirements.txt
 ```
 
+The only dependency is [segno](https://pypi.org/project/segno/) — pure Python,
+no compiled extensions.
+
 `aapt2` and `apksigner` are located automatically from `ANDROID_HOME`,
-`ANDROID_SDK_ROOT`, or the default SDK path.
+`ANDROID_SDK_ROOT`, or the default SDK path. They ship with the Android SDK and
+are not pip-installable.
 
 ## Options
 
